@@ -5,6 +5,7 @@ import platform
 import psutil
 import GPUtil
 from datetime import datetime
+import time
 
 version = "0.1.0"
 
@@ -15,6 +16,18 @@ def clear_console():
     else:
         os.system('clear')
         os.system('clear')  # Clear the buffer
+
+def move_cursor_up(lines):
+    print(f"\033[{lines}A", end="", flush=True)
+
+def move_cursor_down(lines):
+    print(f"\033[{lines}B", end="", flush=True)
+
+def move_cursor_to_column(column):
+    print(f"\033[{column}G", end="", flush=True)
+
+def clear_line():
+    print("\033[K", end="", flush=True)
 
 banner = rf"""
         ____           _                                                
@@ -33,9 +46,10 @@ banner = rf"""
 options = rf"""
         [1] IP Inspect
         [2] Device Specifications
-        [3] Roblox Account Beamer (EXPERIMENTAL, use this for testing purposes only)
+        [3] Roblox Account Lookup
         [U] Check for updates
         [X] Exit
+        
 """
     
 def display_menu():
@@ -90,11 +104,81 @@ def inspect_ip():
         print("Failed to retrieve data.")
         input("Press Enter to continue...")
 
+def roblox_lookup_by_username(username):
+    try:
+        response = requests.get(f"https://api.roblox.com/users/get-by-username?username={username}", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if 'Id' in data:
+                user_id = data['Id']
+                user_info = get_roblox_user_info(user_id)
+                if user_info:
+                    print(f"Username: {username}")
+                    print(f"User ID: {user_info.get('id')}")
+                    print(f"Display Name: {user_info.get('displayName')}")
+                    print(f"Description: {user_info.get('description')}")
+                    print(f"Created: {user_info.get('created')}")
+                    print(f"Is Banned: {user_info.get('isBanned')}")
+                    print(f"External App Display Name: {user_info.get('externalAppDisplayName')}")
+                else:
+                    print("Could not retrieve additional user information.")
+            else:
+                print(f"Error: {data.get('errorMessage', 'Unknown error')}")
+        else:
+            print("Failed to retrieve data.")
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection Error: Could not connect to Roblox API. Please check your internet connection and DNS settings. {e}")
+    except requests.exceptions.Timeout as e:
+        print(f"Timeout Error: Connection to Roblox API timed out. Please check your internet connection. {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    input("Press Enter to continue...")
+
+def roblox_lookup_by_user_id(user_id):
+    try:
+        user_info = get_roblox_user_info(user_id)
+        if user_info:
+            print(f"User ID: {user_info.get('id')}")
+            print(f"Username: {user_info.get('name')}")
+            print(f"Display Name: {user_info.get('displayName')}")
+            print(f"Description: {user_info.get('description')}")
+            print(f"Created: {user_info.get('created')}")
+            print(f"Is Banned: {user_info.get('isBanned')}")
+            print(f"External App Display Name: {user_info.get('externalAppDisplayName')}")
+        else:
+            print("Failed to retrieve user information.")
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection Error: Could not connect to Roblox API. Please check your internet connection and DNS settings. {e}")
+    except requests.exceptions.Timeout as e:
+        print(f"Timeout Error: Connection to Roblox API timed out. Please check your internet connection. {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    input("Press Enter to continue...")
+
+def get_roblox_user_info(user_id):
+    try:
+        response = requests.get(f"https://users.roblox.com/v1/users/{user_id}", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print("Failed to retrieve user information.")
+            return None
+    except requests.exceptions.ConnectionError as e:
+        raise  # Re-raise the exception to be caught in the calling functions
+    except requests.exceptions.Timeout as e:
+        raise  # Re-raise the exception to be caught in the calling functions
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
+
+# Store initial cursor position after printing the banner and options
+initial_position = 10 # Approximate line number after banner and options
+
 while True:
     display_menu()
     useroption = input("Select an option: ")
 
-    if useroption == "u" or useroption == "U":
+    if useroption.lower() == "u":
         clear_console()
         subprocess.run(["python3", "update.py"])
     elif useroption == "1":
@@ -132,7 +216,9 @@ while True:
                 print(f"Maximum Frequency: {cpu_freq.max:.2f} MHz")
         print(f"Physical cores: {psutil.cpu_count(logical=False)}")
         print(f"Total cores: {psutil.cpu_count(logical=True)}")
-        print(f"CPU Usage: {psutil.cpu_percent(interval=1)}%")
+        
+        cpu_usage = psutil.cpu_percent(interval=1)
+        print(f"CPU Usage: {cpu_usage}%")
         
         # Per-core CPU usage
         print("\n## Per-core CPU Usage ##")
@@ -201,7 +287,30 @@ while True:
             print("No battery detected")
         
         input("Press Enter to continue...")
-    elif useroption == "x" or useroption == "X":
+    elif useroption == "3":
+        clear_console()
+        print(banner)
+        print("\033[92m        [3] Roblox Account Lookup\033[0m")
+        print("--------------------------------")
+        print("")
+        print("             [3A] Username")
+        print("             [3B] User ID")
+        print("             [B] Back")
+        usersuboption = input("Select a method: ")
+        
+        if usersuboption.lower() == "3a":
+            username = input("Enter Roblox username: ")
+            roblox_lookup_by_username(username)
+        elif usersuboption.lower() == "3b":
+            user_id = input("Enter Roblox user ID: ")
+            roblox_lookup_by_user_id(user_id)
+        elif usersuboption.lower() == "b":
+            continue
+        else:
+            print("Invalid option selected.")
+            input("Press Enter to continue...")
+
+    elif useroption.lower() == "x":
         clear_console()
         print("Exiting to console.")
         break
